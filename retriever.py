@@ -1,4 +1,5 @@
 import os
+import threading
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -6,15 +7,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _client: genai.Client | None = None
+_client_lock = threading.Lock()
 
 
 def _get_client() -> genai.Client:
     global _client
-    if _client is None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise EnvironmentError("GEMINI_API_KEY is not set.")
-        _client = genai.Client(api_key=api_key)
+    with _client_lock:
+        if _client is None:
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise EnvironmentError("GEMINI_API_KEY is not set.")
+            _client = genai.Client(api_key=api_key)
     return _client
 
 
@@ -41,7 +44,10 @@ def answer_question(question: str) -> str:
         ),
     )
 
-    answer = response.text.strip()
+    try:
+        answer = response.text.strip()
+    except (ValueError, AttributeError):
+        return "I couldn't generate an answer. The model did not return a response."
 
     try:
         chunks = response.candidates[0].grounding_metadata.grounding_chunks
@@ -57,6 +63,7 @@ def answer_question(question: str) -> str:
         first_text = None
 
     if first_text:
-        answer = f"{answer}\n\n> {first_text.strip()}"
+        quoted = "\n> ".join(first_text.strip().splitlines())
+        answer = f"{answer}\n\n> {quoted}"
 
     return answer
