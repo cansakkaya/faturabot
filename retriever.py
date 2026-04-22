@@ -98,17 +98,21 @@ def extract_sections(pointers: list[dict]) -> str:
         section_lines = []
         in_section = False
 
+        section_depth = 0
+
         for line in lines:
             stripped = line.lstrip("#").strip()
             is_heading = line.startswith("#")
+            heading_depth = len(line) - len(line.lstrip("#")) if is_heading else 0
 
             if is_heading and stripped == section_heading:
                 in_section = True
+                section_depth = heading_depth
                 section_lines.append(line)
                 continue
 
             if in_section:
-                if is_heading:
+                if is_heading and heading_depth <= section_depth:
                     break
                 section_lines.append(line)
 
