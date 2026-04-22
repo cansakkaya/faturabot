@@ -148,3 +148,14 @@ def generate_answer(question: str, context: str) -> str:
         return response.text.strip()
     except Exception as e:
         raise RuntimeError(f"Gemini API call failed during answer generation: {e}") from e
+
+def answer_question(question: str) -> str:
+    if not list(INDEX_DIR.glob("*.index.md")):
+        return "No index files found. Please run `index.py` first."
+
+    pointers = find_relevant_sections(question)
+    if not pointers:
+        return "I couldn't find information on this topic in the knowledge base."
+
+    context = extract_sections(pointers)
+    return generate_answer(question, context)

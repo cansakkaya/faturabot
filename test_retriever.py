@@ -39,6 +39,17 @@ def test_generate_answer_no_context():
     answer = generate_answer("How do I get a refund?", "")
     assert answer == "I couldn't find information on this topic in the knowledge base."
 
+from retriever import answer_question
+
+def test_end_to_end_refund():
+    answer = answer_question("How do I get a refund?")
+    assert len(answer) > 20, "Expected a real answer"
+    assert "30 days" in answer or "refund" in answer.lower(), f"Unexpected answer: {answer}"
+
+def test_end_to_end_unknown():
+    answer = answer_question("What is the airspeed velocity of an unladen swallow?")
+    assert answer == "I couldn't find information on this topic in the knowledge base."
+
 if __name__ == "__main__":
     test_finds_refund_section()
     print("test_finds_refund_section PASSED")
@@ -52,3 +63,7 @@ if __name__ == "__main__":
     print("test_generate_answer_uses_context PASSED")
     test_generate_answer_no_context()
     print("test_generate_answer_no_context PASSED")
+    test_end_to_end_refund()
+    print("test_end_to_end_refund PASSED")
+    test_end_to_end_unknown()
+    print("test_end_to_end_unknown PASSED")
