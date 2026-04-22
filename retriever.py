@@ -123,3 +123,28 @@ def extract_sections(pointers: list[dict]) -> str:
         extracted.append("\n".join(section_lines).strip())
 
     return "\n\n---\n\n".join(extracted)
+
+ANSWER_PROMPT = """\
+You are a helpful assistant. Answer the user's question using ONLY the provided source content.
+Include a verbatim quote from the most relevant part of the source, formatted as a blockquote (starting with >).
+If the source content does not contain enough information to answer the question, say exactly:
+"I couldn't find information on this topic in the knowledge base."
+Do not use any knowledge outside the provided source content.
+
+User question: {question}
+
+Source content:
+{context}
+"""
+
+def generate_answer(question: str, context: str) -> str:
+    if not context.strip():
+        return "I couldn't find information on this topic in the knowledge base."
+
+    model = _get_model()
+    prompt = ANSWER_PROMPT.format(question=question, context=context)
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        raise RuntimeError(f"Gemini API call failed during answer generation: {e}") from e
