@@ -1,161 +1,62 @@
 import os
-import re
-import json
-from pathlib import Path
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
-import google.generativeai as genai
 
 load_dotenv()
 
-BASE_DIR = Path(__file__).parent
-DOCS_DIR = BASE_DIR / "docs"
-INDEX_DIR = DOCS_DIR / "indexes"
+_client: genai.Client | None = None
 
-RETRIEVAL_PROMPT = """\
-You are a retrieval assistant. Given a set of document indexes and a user question, identify which document sections are relevant to answering the question.
 
-Return ONLY a JSON array. Each element must be an object with:
-  "file": the original .md filename (e.g. "sample.md")
-  "section": the exact section heading (e.g. "Refund Policy")
-
-If no sections are relevant, return an empty array: []
-
-Do not include any explanation, markdown formatting, or code fences — just the raw JSON array.
-
-User question: {question}
-
-Document indexes:
-{indexes}
-"""
-
-_model = None
-
-def _get_model():
-    global _model
-    if _model is None:
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise EnvironmentError("GEMINI_API_KEY is not set. Check your .env file.")
-        genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel("gemini-flash-latest")
-    return _model
+            raise EnvironmentError("GEMINI_API_KEY is not set.")
+        _client = genai.Client(api_key=api_key)
+    return _client
 
-def _load_indexes() -> str:
-    index_files = sorted(INDEX_DIR.glob("*.index.md"))
-    if not index_files:
-        return ""
-    parts = []
-    for idx_path in index_files:
-        try:
-            parts.append(idx_path.read_text(encoding="utf-8"))
-        except OSError as e:
-            print(f"WARNING: Could not read index file {idx_path}: {e}")
-    return "\n\n---\n\n".join(parts)
-
-def find_relevant_sections(question: str) -> list[dict]:
-    indexes = _load_indexes()
-    if not indexes:
-        return []
-
-    model = _get_model()
-    prompt = RETRIEVAL_PROMPT.format(question=question, indexes=indexes)
-    try:
-        response = model.generate_content(prompt)
-        raw = response.text.strip()
-    except Exception as e:
-        raise RuntimeError(f"Gemini API call failed during section retrieval: {e}") from e
-
-    raw = re.sub(r"^```(?:json)?\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
-    raw = raw.strip()
-
-    try:
-        results = json.loads(raw)
-        if not isinstance(results, list):
-            return []
-        return [r for r in results if isinstance(r, dict) and "file" in r and "section" in r]
-    except json.JSONDecodeError:
-        return []
-
-def extract_sections(pointers: list[dict]) -> str:
-    extracted = []
-    for pointer in pointers:
-        filename = pointer["file"]
-        section_heading = pointer["section"]
-        md_path = DOCS_DIR / filename
-
-        if not md_path.exists():
-            print(f"WARNING: {md_path} not found, skipping.")
-            continue
-
-        try:
-            content = md_path.read_text(encoding="utf-8")
-        except OSError as e:
-            print(f"WARNING: Could not read {md_path}: {e}")
-            continue
-
-        lines = content.splitlines()
-        section_lines = []
-        in_section = False
-
-        section_depth = 0
-
-        for line in lines:
-            stripped = line.lstrip("#").strip()
-            is_heading = line.startswith("#")
-            heading_depth = len(line) - len(line.lstrip("#")) if is_heading else 0
-
-            if is_heading and stripped == section_heading:
-                in_section = True
-                section_depth = heading_depth
-                section_lines.append(line)
-                continue
-
-            if in_section:
-                if is_heading and heading_depth <= section_depth:
-                    break
-                section_lines.append(line)
-
-        if not section_lines:
-            print(f"WARNING: Section '{section_heading}' not found in {filename}, skipping.")
-            continue
-
-        extracted.append("\n".join(section_lines).strip())
-
-    return "\n\n---\n\n".join(extracted)
-
-ANSWER_PROMPT = """\
-You are a helpful assistant. Answer the user's question using ONLY the provided source content.
-Include a verbatim quote from the most relevant part of the source, formatted as a blockquote (starting with >).
-If the source content does not contain enough information to answer the question, say exactly:
-"I couldn't find information on this topic in the knowledge base."
-Do not use any knowledge outside the provided source content.
-
-User question: {question}
-
-Source content:
-{context}
-"""
-
-def generate_answer(question: str, context: str) -> str:
-    if not context.strip():
-        return "I couldn't find information on this topic in the knowledge base."
-
-    model = _get_model()
-    prompt = ANSWER_PROMPT.format(question=question, context=context)
-    try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        raise RuntimeError(f"Gemini API call failed during answer generation: {e}") from e
 
 def answer_question(question: str) -> str:
-    if not list(INDEX_DIR.glob("*.index.md")):
-        return "No index files found. Please run `index.py` first."
+    store_name = os.getenv("GEMINI_FILE_SEARCH_STORE_NAME", "").strip()
+    if not store_name:
+        raise EnvironmentError(
+            "GEMINI_FILE_SEARCH_STORE_NAME is not set. Run setup.py first."
+        )
 
-    pointers = find_relevant_sections(question)
-    if not pointers:
-        return "I couldn't find information on this topic in the knowledge base."
+    client = _get_client()
 
-    context = extract_sections(pointers)
-    return generate_answer(question, context)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-lite",
+        contents=question,
+        config=types.GenerateContentConfig(
+            tools=[
+                types.Tool(
+                    file_search=types.FileSearch(
+                        file_search_store_names=[store_name]
+                    )
+                )
+            ]
+        ),
+    )
+
+    answer = response.text.strip()
+
+    try:
+        chunks = response.candidates[0].grounding_metadata.grounding_chunks
+        first_text = next(
+            (
+                c.retrieved_context.text
+                for c in chunks
+                if c.retrieved_context and c.retrieved_context.text
+            ),
+            None,
+        )
+    except (AttributeError, IndexError):
+        first_text = None
+
+    if first_text:
+        answer = f"{answer}\n\n> {first_text.strip()}"
+
+    return answer
