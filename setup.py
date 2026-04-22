@@ -25,17 +25,22 @@ def _existing_display_names(client: genai.Client, store_name: str) -> set[str]:
     return names
 
 
-def _upload_pdf(client: genai.Client, store_name: str, pdf_path: Path) -> None:
+def _upload_pdf(client: genai.Client, store_name: str, pdf_path: Path) -> bool:
     print(f"  Uploading {pdf_path.name}...")
-    operation = client.file_search_stores.upload_to_file_search_store(
-        file=str(pdf_path),
-        file_search_store_name=store_name,
-        config={"display_name": pdf_path.name},
-    )
-    while not operation.done:
-        time.sleep(5)
-        operation = client.operations.get(operation)
-    print(f"  Done: {pdf_path.name}")
+    try:
+        operation = client.file_search_stores.upload_to_file_search_store(
+            file=str(pdf_path),
+            file_search_store_name=store_name,
+            config={"display_name": pdf_path.name},
+        )
+        while not operation.done:
+            time.sleep(5)
+            operation = client.operations.get(operation)
+        print(f"  Done: {pdf_path.name}")
+        return True
+    except Exception as e:
+        print(f"  ERROR uploading {pdf_path.name}: {e}")
+        return False
 
 
 def main() -> None:
@@ -59,6 +64,10 @@ def main() -> None:
     existing = _existing_display_names(client, store_name)
     print(f"Documents already in store: {len(existing)}")
 
+    if not STORE_DIR.is_dir():
+        print(f"docs/store/ directory not found: {STORE_DIR}")
+        return
+
     pdfs = sorted(STORE_DIR.glob("*.pdf"))
     if not pdfs:
         print("No PDFs found in docs/store/")
@@ -66,15 +75,18 @@ def main() -> None:
 
     uploaded = 0
     skipped = 0
+    failed = 0
     for pdf_path in pdfs:
         if pdf_path.name in existing:
             print(f"  Skipping {pdf_path.name} (already uploaded)")
             skipped += 1
         else:
-            _upload_pdf(client, store_name, pdf_path)
-            uploaded += 1
+            if _upload_pdf(client, store_name, pdf_path):
+                uploaded += 1
+            else:
+                failed += 1
 
-    print(f"\nDone. Uploaded: {uploaded}, Skipped: {skipped}")
+    print(f"\nDone. Uploaded: {uploaded}, Skipped: {skipped}, Failed: {failed}")
 
 
 if __name__ == "__main__":
