@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from pathlib import Path
 from dotenv import load_dotenv
@@ -27,12 +28,17 @@ Document indexes:
 {indexes}
 """
 
+_model = None
+
 def _get_model():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise EnvironmentError("GEMINI_API_KEY is not set. Check your .env file.")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-flash-latest")
+    global _model
+    if _model is None:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise EnvironmentError("GEMINI_API_KEY is not set. Check your .env file.")
+        genai.configure(api_key=api_key)
+        _model = genai.GenerativeModel("gemini-flash-latest")
+    return _model
 
 def _load_indexes() -> str:
     index_files = sorted(INDEX_DIR.glob("*.index.md"))
@@ -40,7 +46,10 @@ def _load_indexes() -> str:
         return ""
     parts = []
     for idx_path in index_files:
-        parts.append(idx_path.read_text(encoding="utf-8"))
+        try:
+            parts.append(idx_path.read_text(encoding="utf-8"))
+        except OSError as e:
+            print(f"WARNING: Could not read index file {idx_path}: {e}")
     return "\n\n---\n\n".join(parts)
 
 def find_relevant_sections(question: str) -> list[dict]:
@@ -50,15 +59,15 @@ def find_relevant_sections(question: str) -> list[dict]:
 
     model = _get_model()
     prompt = RETRIEVAL_PROMPT.format(question=question, indexes=indexes)
-    response = model.generate_content(prompt)
-    raw = response.text.strip()
+    try:
+        response = model.generate_content(prompt)
+        raw = response.text.strip()
+    except Exception as e:
+        raise RuntimeError(f"Gemini API call failed during section retrieval: {e}") from e
 
-    # Strip markdown code fences if Gemini wraps the JSON
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    raw = raw.strip()
 
     try:
         results = json.loads(raw)
