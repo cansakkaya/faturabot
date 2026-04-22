@@ -13,8 +13,25 @@ def test_returns_empty_for_irrelevant_question():
     results = find_relevant_sections("What is the speed of light?")
     assert results == [], f"Expected empty list, got {results}"
 
+from retriever import extract_sections
+
+def test_extracts_refund_section_text():
+    pointers = [{"file": "sample.md", "section": "Refund Policy"}]
+    text = extract_sections(pointers)
+    assert "30 days" in text, f"Expected refund content, got: {text}"
+    assert "Refund Policy" in text, f"Expected section heading, got: {text}"
+
+def test_skips_missing_section_gracefully():
+    pointers = [{"file": "sample.md", "section": "Nonexistent Section"}]
+    text = extract_sections(pointers)
+    assert text == "", f"Expected empty string, got: {text}"
+
 if __name__ == "__main__":
     test_finds_refund_section()
     print("test_finds_refund_section PASSED")
     test_returns_empty_for_irrelevant_question()
     print("test_returns_empty_for_irrelevant_question PASSED")
+    test_extracts_refund_section_text()
+    print("test_extracts_refund_section_text PASSED")
+    test_skips_missing_section_gracefully()
+    print("test_skips_missing_section_gracefully PASSED")

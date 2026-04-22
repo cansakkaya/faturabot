@@ -76,3 +76,46 @@ def find_relevant_sections(question: str) -> list[dict]:
         return [r for r in results if isinstance(r, dict) and "file" in r and "section" in r]
     except json.JSONDecodeError:
         return []
+
+def extract_sections(pointers: list[dict]) -> str:
+    extracted = []
+    for pointer in pointers:
+        filename = pointer["file"]
+        section_heading = pointer["section"]
+        md_path = DOCS_DIR / filename
+
+        if not md_path.exists():
+            print(f"WARNING: {md_path} not found, skipping.")
+            continue
+
+        try:
+            content = md_path.read_text(encoding="utf-8")
+        except OSError as e:
+            print(f"WARNING: Could not read {md_path}: {e}")
+            continue
+
+        lines = content.splitlines()
+        section_lines = []
+        in_section = False
+
+        for line in lines:
+            stripped = line.lstrip("#").strip()
+            is_heading = line.startswith("#")
+
+            if is_heading and stripped == section_heading:
+                in_section = True
+                section_lines.append(line)
+                continue
+
+            if in_section:
+                if is_heading:
+                    break
+                section_lines.append(line)
+
+        if not section_lines:
+            print(f"WARNING: Section '{section_heading}' not found in {filename}, skipping.")
+            continue
+
+        extracted.append("\n".join(section_lines).strip())
+
+    return "\n\n---\n\n".join(extracted)
