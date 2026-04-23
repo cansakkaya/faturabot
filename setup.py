@@ -1,5 +1,7 @@
 import os
+import re
 import time
+import unicodedata
 from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
@@ -25,13 +27,19 @@ def _existing_display_names(client: genai.Client, store_name: str) -> set[str]:
     return names
 
 
+def _ascii_display_name(name: str) -> str:
+    """Normalize unicode characters to ASCII equivalents for the API."""
+    normalized = unicodedata.normalize("NFKD", name)
+    return normalized.encode("ascii", "ignore").decode("ascii")
+
+
 def _upload_pdf(client: genai.Client, store_name: str, pdf_path: Path) -> bool:
     print(f"  Uploading {pdf_path.name}...")
     try:
         operation = client.file_search_stores.upload_to_file_search_store(
             file=str(pdf_path),
             file_search_store_name=store_name,
-            config={"display_name": pdf_path.name},
+            config={"display_name": _ascii_display_name(pdf_path.name)},
         )
         while not operation.done:
             time.sleep(5)

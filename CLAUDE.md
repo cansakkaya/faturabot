@@ -26,7 +26,7 @@ Single-stage Gemini File Search retrieval:
 - **Paths anchored** with `Path(__file__).parent` in `setup.py` — never rely on `cwd`.
 - **Gemini client singleton** — `_client` in `retriever.py` is initialized once via `_get_client()`.
 - **SDK:** Use `from google import genai` (`google-genai`), not `google-generativeai`.
-- **Model name:** `gemini-2.5-flash-lite`.
+- **Model name:** `gemini-3-flash-preview`.
 - **Do not commit `.env`** — it is gitignored. Use `.env.example` as the template.
 
 ## Environment Variables
