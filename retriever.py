@@ -34,13 +34,20 @@ def answer_question(question: str) -> str:
         model="gemini-2.5-flash-lite",
         contents=question,
         config=types.GenerateContentConfig(
+            system_instruction=(
+                "You are a helpful assistant. "
+                "Always answer using only the reference documents provided. "
+                "Never use your own knowledge or information from outside the reference documents. "
+                "If the reference documents do not contain enough information to answer the question, "
+                "say exactly: \"I couldn't find information on this topic in the reference documents.\""
+            ),
             tools=[
                 types.Tool(
                     file_search=types.FileSearch(
                         file_search_store_names=[store_name]
                     )
                 )
-            ]
+            ],
         ),
     )
 
