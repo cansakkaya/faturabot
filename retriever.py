@@ -1,13 +1,12 @@
 import os
 import threading
-from typing import Optional
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
-_client: Optional[genai.Client] = None
+_client: genai.Client | None = None
 _client_lock = threading.Lock()
 
 
