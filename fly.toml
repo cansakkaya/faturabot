@@ -3,12 +3,8 @@ primary_region = 'ams'
 
 [build]
 
-[processes]
-  app = "python bot.py"
-
-[[services]]
-  auto_stop_machines = false
-  auto_start_machines = false
+[env]
+  FLY_NO_MACHINE_AUTOSTOP = "true"
 
 [[vm]]
   memory = '256mb'
