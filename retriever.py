@@ -79,8 +79,9 @@ def answer_question(history: list[dict]) -> str:
                 "Avoid unnecessary filler or courtesy phrases.\n\n"
                 "Answer strictly from the provided reference documents. "
                 "Never fabricate or infer information not explicitly found in the documents. "
-                "If no relevant information is found, respond only with: "
-                "\"Bu konu ile ilgili şu anda bilgi veremiyorum. Kendimi geliştirmeye devam ediyorum\"\n\n"
+                "If no relevant information is found in the documents, respond with a short natural Turkish sentence "
+                "that reflects the question. For example, if asked about error 1000, say 'Böyle bir hata kodu bulunamadı.' "
+                "If asked about a process, say 'Bu konuyla ilgili bilgiye şu anda erişemiyorum. Kendimi geliştirmeye devam ediyorum.' Keep it under one sentence.\n\n"
                 "Format all responses using Slack mrkdwn syntax:\n"
                 "- Bold: *text* (single asterisks only, never double)\n"
                 "- Italic: _text_\n"
@@ -113,15 +114,7 @@ def answer_question(history: list[dict]) -> str:
     except (AttributeError, IndexError):
         chunks = []
 
-    NO_RESULT_MARKER = "Bu konu ile ilgili şu anda bilgi veremiyorum"
-    answer_is_from_docs = chunks and NO_RESULT_MARKER not in answer and any(
-        word in answer
-        for c in chunks
-        if c.retrieved_context and c.retrieved_context.text
-        for word in c.retrieved_context.text.split()[:20]
-        if len(word) > 5
-    )
-    if answer_is_from_docs:
+    if chunks:
         pdf_links = _parse_pdf_links()
 
         # Collect unique sources with their page numbers
