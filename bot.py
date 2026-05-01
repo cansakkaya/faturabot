@@ -1,6 +1,8 @@
 import os
 import re
 import datetime
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -79,7 +81,25 @@ def handle_message(event, say, client):
     say(text=_md_to_mrkdwn(answer), thread_ts=thread_ts)
     print(f"[{ts}] REPLIED in thread {thread_ts}")
 
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+    def log_message(self, *args):
+        pass
+
 if __name__ == "__main__":
-    handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
-    print("Bot is running. Listening for messages...")
-    handler.start()
+    import sys
+    print("Starting FaturaBot...", flush=True)
+    port = int(os.environ.get("PORT", 8080))
+    health_server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    threading.Thread(target=health_server.serve_forever, daemon=True).start()
+    print(f"Health check server on port {port}", flush=True)
+    try:
+        handler = SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
+        print("Bot is running. Listening for messages...", flush=True)
+        handler.start()
+    except Exception as e:
+        print(f"FATAL: {e}", flush=True)
+        sys.exit(1)
