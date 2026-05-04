@@ -36,8 +36,14 @@ def _parse_pdf_links() -> dict[str, str]:
 
 def _extract_pages(text: str) -> list[int]:
     """Extract page numbers from patterns like '8/21' in chunk text."""
-    matches = re.findall(r'\b(\d+)/\d+\b', text)
-    return sorted(set(int(m) for m in matches))
+    matches = re.findall(r'\b(\d+)/(\d+)\b', text)
+    pages = []
+    for current, total in matches:
+        current, total = int(current), int(total)
+        # Both sides must be plausible page numbers (1–999) and current ≤ total
+        if 1 <= current <= 999 and 1 <= total <= 999 and current <= total:
+            pages.append(current)
+    return sorted(set(pages))
 
 
 def answer_question(history: list[dict]) -> str:
