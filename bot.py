@@ -51,7 +51,7 @@ def _fetch_thread_history(client, channel: str, thread_ts: str) -> list[dict]:
 
 @app.event("message")
 def handle_message(event, say, client):
-if event.get("bot_id"):
+    if event.get("bot_id"):
         return
     if event.get("channel") != CHANNEL_ID:
         return

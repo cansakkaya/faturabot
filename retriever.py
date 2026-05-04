@@ -87,6 +87,11 @@ def answer_question(history: list[dict]) -> str:
                 "Never fabricate or infer information not explicitly found in the documents. "
                 "If no relevant information is found in the documents, respond with exactly: NO_RESULT:\n"
                 "Nothing else. Never use NO_RESULT: if you found relevant information.\n\n"
+                "If the user's question has TWO parts and the documents only address ONE of them, "
+                "start your response with: PARTIAL_RESULT: <one sentence in Turkish explaining what is NOT covered>\n"
+                "Then on the next line, provide what the documents do cover. "
+                "Example: PARTIAL_RESULT: Gider pusulası veya iade faturası düzenlenmesi konusunda doğrudan bir yönlendirme bulunmamaktadır.\n"
+                "Never use PARTIAL_RESULT: if the documents fully answer the question.\n\n"
                 "Format all responses using Slack mrkdwn syntax:\n"
                 "- Bold: *text* (single asterisks only, never double)\n"
                 "- Italic: _text_\n"
@@ -122,6 +127,20 @@ def answer_question(history: list[dict]) -> str:
     is_not_found = answer.startswith("NO_RESULT:")
     if is_not_found:
         answer = "Bu konuyla ilgili bilgiye ulaşamadım. e-Fatura süreçleri hakkında başka sorularında yardımcı olabilirim."
+
+    is_partial = answer.startswith("PARTIAL_RESULT:")
+    if is_partial:
+        # Extract the "what's missing" sentence and the rest of the answer
+        first_newline = answer.find("\n")
+        if first_newline != -1:
+            missing_part = answer[len("PARTIAL_RESULT:"):first_newline].strip()
+            rest = answer[first_newline:].strip()
+            answer = f":warning: *{missing_part}*\n\n{rest}"
+        else:
+            # No body after marker — treat as not found
+            answer = "Bu konuyla ilgili bilgiye ulaşamadım. e-Fatura süreçleri hakkında başka sorularında yardımcı olabilirim."
+            is_not_found = True
+            is_partial = False
 
     if chunks and not is_not_found:
         pdf_links = _parse_pdf_links()
