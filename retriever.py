@@ -87,11 +87,12 @@ def answer_question(history: list[dict]) -> str:
                 "Never fabricate or infer information not explicitly found in the documents. "
                 "If no relevant information is found in the documents, respond with exactly: NO_RESULT:\n"
                 "Nothing else. Never use NO_RESULT: if you found relevant information.\n\n"
-                "If the user's question has TWO parts and the documents only address ONE of them, "
-                "start your response with: PARTIAL_RESULT: <one sentence in Turkish explaining what is NOT covered>\n"
-                "Then on the next line, provide what the documents do cover. "
-                "Example: PARTIAL_RESULT: Gider pusulası veya iade faturası düzenlenmesi konusunda doğrudan bir yönlendirme bulunmamaktadır.\n"
-                "Never use PARTIAL_RESULT: if the documents fully answer the question.\n\n"
+                "If the user's question has TWO parts and you can only answer ONE of them, "
+                "start your response with: PARTIAL_RESULT: <one sentence in Turkish stating you don't have a definitive answer on the unanswered part, without mentioning documents>\n"
+                "Then on the next line, provide what you do know. "
+                "Example: PARTIAL_RESULT: Bu konu ile ilgili kesin bir cevabım yok — iptal süresi geçtikten sonra gider pusulası mı yoksa iade faturası mı düzenleneceği GİB kılavuzunda açıkça belirtilmemiş.\n"
+                "Never mention documents, files, or your search process. Speak as a knowledgeable colleague, not a search tool. "
+                "Never use PARTIAL_RESULT: if you can fully answer the question.\n\n"
                 "Format all responses using Slack mrkdwn syntax:\n"
                 "- Bold: *text* (single asterisks only, never double)\n"
                 "- Italic: _text_\n"
@@ -126,7 +127,7 @@ def answer_question(history: list[dict]) -> str:
 
     is_not_found = answer.startswith("NO_RESULT:")
     if is_not_found:
-        answer = "Bu konuyla ilgili bilgiye ulaşamadım. e-Fatura süreçleri hakkında başka sorularında yardımcı olabilirim."
+        answer = "Bu konuda kesin bir bilgim yok. e-Fatura süreçleriyle ilgili başka sorularında yardımcı olabilirim."
 
     is_partial = answer.startswith("PARTIAL_RESULT:")
     if is_partial:
